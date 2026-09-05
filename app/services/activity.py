@@ -34,3 +34,15 @@ def delete_activity(
     activity: Activity,
 ) -> None:
     activity_repository.delete(db, activity)
+
+
+def get_activity_by_schedule(
+    db: Session,
+    scheduled_date,
+    scheduled_time,
+):
+    return activity_repository.get_by_schedule(
+        db,
+        scheduled_date,
+        scheduled_time,
+    )

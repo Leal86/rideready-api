@@ -1,6 +1,13 @@
 import httpx2
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -53,8 +60,27 @@ def get_activity(
 )
 def create_activity(
     payload: ActivityCreate,
+    allow_conflict: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
+    if not allow_conflict:
+        conflicting_activity = activity_service.get_activity_by_schedule(
+            db,
+            payload.scheduled_date,
+            payload.scheduled_time,
+        )
+
+        if conflicting_activity is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": (
+                        "Já existe uma atividade marcada " "para esta data e hora."
+                    ),
+                    "conflicting_activity_id": conflicting_activity.id,
+                    "conflicting_activity_title": conflicting_activity.title,
+                },
+            )
     try:
         location = geocode_location(payload.location_name)
     except httpx2.HTTPError:

@@ -2,12 +2,34 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from datetime import date, time
 
 from app.models.activity import Activity
 
 
+def get_by_schedule(
+    db: Session,
+    scheduled_date: date,
+    scheduled_time: time,
+) -> Activity | None:
+    statement = (
+        select(Activity)
+        .where(
+            Activity.scheduled_date == scheduled_date,
+            Activity.scheduled_time == scheduled_time,
+        )
+        .order_by(Activity.id)
+    )
+
+    return db.scalars(statement).first()
+
+
 def get_all(db: Session) -> list[Activity]:
-    statement = select(Activity).order_by(Activity.scheduled_date, Activity.scheduled_time)
+    statement = select(Activity).order_by(
+        Activity.scheduled_date,
+        Activity.scheduled_time,
+        Activity.id,
+    )
 
     return list(db.scalars(statement).all())
 

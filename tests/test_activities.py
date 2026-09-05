@@ -60,7 +60,7 @@ def test_create_activity():
     }
 
     response = client.post(
-        "/activities",
+        "/activities?allow_conflict=true",
         json=payload,
     )
 
@@ -86,7 +86,7 @@ def test_get_activity_by_id():
     }
 
     create_response = client.post(
-        "/activities",
+        "/activities?allow_conflict=true",
         json=payload,
     )
 
@@ -122,7 +122,7 @@ def test_update_activity():
     }
 
     create_response = client.post(
-        "/activities",
+        "/activities?allow_conflict=true",
         json=payload,
     )
 
@@ -175,7 +175,7 @@ def test_delete_activity():
     }
 
     create_response = client.post(
-        "/activities",
+        "/activities?allow_conflict=true",
         json=payload,
     )
 
@@ -225,7 +225,7 @@ def test_get_activity_weather_available(monkeypatch):
     }
 
     create_response = client.post(
-        "/activities",
+        "/activities?allow_conflict=true",
         json=payload,
     )
 
@@ -252,9 +252,7 @@ def test_get_activity_weather_available(monkeypatch):
         fake_weather_forecast,
     )
 
-    response = client.get(
-        f"/activities/{activity_id}/weather"
-    )
+    response = client.get(f"/activities/{activity_id}/weather")
 
     assert response.status_code == 200
 
@@ -281,7 +279,7 @@ def test_get_activity_weather_unavailable(monkeypatch):
     }
 
     create_response = client.post(
-        "/activities",
+        "/activities?allow_conflict=true",
         json=payload,
     )
 
@@ -300,9 +298,7 @@ def test_get_activity_weather_unavailable(monkeypatch):
         fake_weather_forecast,
     )
 
-    response = client.get(
-        f"/activities/{activity_id}/weather"
-    )
+    response = client.get(f"/activities/{activity_id}/weather")
 
     assert response.status_code == 200
 
@@ -315,11 +311,44 @@ def test_get_activity_weather_unavailable(monkeypatch):
 
 
 def test_get_activity_weather_not_found():
-    response = client.get(
-        "/activities/999999/weather"
-    )
+    response = client.get("/activities/999999/weather")
 
     assert response.status_code == 404
-    assert response.json() == {
-        "detail": "Atividade não encontrada."
+    assert response.json() == {"detail": "Atividade não encontrada."}
+
+
+def test_create_activity_schedule_conflict():
+    payload = {
+        "title": "Primeira Atividade no Horário",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": "2026-11-15",
+        "scheduled_time": "15:30:00",
+        "notes": "Teste de conflito de horário",
     }
+
+    first_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        "/activities",
+        json={
+            **payload,
+            "title": "Segunda Atividade no Mesmo Horário",
+        },
+    )
+
+    assert second_response.status_code == 409
+
+    data = second_response.json()
+
+    assert data["detail"]["message"] == (
+        "Já existe uma atividade marcada para esta data e hora."
+    )
+
+    assert "conflicting_activity_id" in data["detail"]
+    assert "conflicting_activity_title" in data["detail"]
