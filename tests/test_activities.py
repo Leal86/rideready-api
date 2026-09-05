@@ -2,43 +2,68 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.geocoding import GeocodingResult
+from app.services.locations import LocationSuggestion
 from app.services.weather import WeatherResult
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def mock_geocoding(monkeypatch):
+def mock_location_search(monkeypatch):
     locations = {
-        "Lisboa": GeocodingResult(
+        "Lisboa": LocationSuggestion(
             name="Lisboa",
+            city="Lisboa",
+            state="Lisboa",
+            country="Portugal",
+            country_code="pt",
             latitude=38.72509,
             longitude=-9.14980,
+            formatted="Lisboa, Portugal",
         ),
-        "Porto": GeocodingResult(
+        "Porto": LocationSuggestion(
             name="Porto",
+            city="Porto",
+            state="Porto",
+            country="Portugal",
+            country_code="pt",
             latitude=41.14850,
             longitude=-8.61097,
+            formatted="Porto, Portugal",
         ),
-        "Sintra": GeocodingResult(
+        "Sintra": LocationSuggestion(
             name="Sintra",
+            city="Sintra",
+            state="Lisboa",
+            country="Portugal",
+            country_code="pt",
             latitude=38.80290,
             longitude=-9.38170,
+            formatted="Sintra, Portugal",
         ),
-        "Cascais": GeocodingResult(
+        "Cascais": LocationSuggestion(
             name="Cascais",
+            city="Cascais",
+            state="Lisboa",
+            country="Portugal",
+            country_code="pt",
             latitude=38.69790,
             longitude=-9.42150,
+            formatted="Cascais, Portugal",
         ),
     }
 
-    def fake_geocode_location(location_name):
-        return locations.get(location_name)
+    def fake_search_locations(location_name):
+        location = locations.get(location_name)
+
+        if location is None:
+            return []
+
+        return [location]
 
     monkeypatch.setattr(
-        "app.api.activities.geocode_location",
-        fake_geocode_location,
+        "app.api.activities.search_locations",
+        fake_search_locations,
     )
 
 
@@ -70,7 +95,7 @@ def test_create_activity():
 
     assert data["title"] == "Caminhada de Teste"
     assert data["activity_type"] == "WALKING"
-    assert data["location_name"] == "Lisboa"
+    assert data["location_name"] == "Lisboa, Portugal"
     assert data["status"] == "PLANNED"
     assert "id" in data
 
@@ -101,7 +126,7 @@ def test_get_activity_by_id():
     assert data["id"] == activity_id
     assert data["title"] == "Corrida de Teste"
     assert data["activity_type"] == "RUNNING"
-    assert data["location_name"] == "Porto"
+    assert data["location_name"] == "Porto, Portugal"
 
 
 def test_get_activity_not_found():
@@ -149,7 +174,7 @@ def test_update_activity():
     assert data["notes"] == "Depois da atualização"
 
     assert data["activity_type"] == "HIKING"
-    assert data["location_name"] == "Sintra"
+    assert data["location_name"] == "Sintra, Portugal"
 
 
 def test_update_activity_not_found():

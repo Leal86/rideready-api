@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.activity import ActivityCreate, ActivityResponse, ActivityUpdate
 from app.services import activity as activity_service
-from app.services.geocoding import geocode_location
+from app.services.locations import search_locations
 from app.schemas.weather import WeatherResponse
 from app.services.weather import get_weather_forecast
 from datetime import datetime, timedelta
@@ -97,22 +97,29 @@ def create_activity(
                 },
             )
     try:
-        location = geocode_location(payload.location_name)
+        locations = search_locations(payload.location_name)
     except httpx2.HTTPError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Serviço de localização temporariamente indisponível.",
         )
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de localização não está configurado.",
+        )
 
-    if location is None:
+    if not locations:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Não foi possível encontrar o local informado.",
         )
 
+    location = locations[0]
+
     data = payload.model_dump()
 
-    data["location_name"] = location.name
+    data["location_name"] = location.formatted
     data["latitude"] = location.latitude
     data["longitude"] = location.longitude
 
@@ -141,20 +148,27 @@ def update_activity(
 
     if "location_name" in data:
         try:
-            location = geocode_location(data["location_name"])
+            locations = search_locations(payload.location_name)
         except httpx2.HTTPError:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Serviço de localização temporariamente indisponível.",
             )
+        except RuntimeError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Serviço de localização não está configurado.",
+            )
 
-        if location is None:
+        if not locations:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Não foi possível encontrar o local informado.",
             )
 
-        data["location_name"] = location.name
+        location = locations[0]
+
+        data["location_name"] = location.formatted
         data["latitude"] = location.latitude
         data["longitude"] = location.longitude
 

@@ -1,7 +1,10 @@
 import os
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+load_dotenv()
 
 # Procura uma variável de ambiente chamada "DATABASE_URL" e, se não encontrar, usa a URL padrão para o banco de dados PostgreSQL.
 DATABASE_URL = os.getenv(
