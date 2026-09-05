@@ -16,7 +16,7 @@ from app.services import activity as activity_service
 from app.services.geocoding import geocode_location
 from app.schemas.weather import WeatherResponse
 from app.services.weather import get_weather_forecast
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 router = APIRouter(
     prefix="/activities",
@@ -63,6 +63,21 @@ def create_activity(
     allow_conflict: bool = Query(default=False),
     db: Session = Depends(get_db),
 ):
+    scheduled_datetime = datetime.combine(
+        payload.scheduled_date,
+        payload.scheduled_time,
+    )
+
+
+    if scheduled_datetime < datetime.now():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "field": "scheduled_datetime",
+                "message": "A data e a hora da atividade não podem estar no passado.",
+            },
+        )
+
     if not allow_conflict:
         conflicting_activity = activity_service.get_activity_by_schedule(
             db,
@@ -108,7 +123,7 @@ def create_activity(
     "/{activity_id}",
     response_model=ActivityResponse,
 )
-@router.patch("/{activity_id}", response_model=ActivityResponse)
+
 def update_activity(
     activity_id: int,
     payload: ActivityUpdate,
