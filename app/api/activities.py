@@ -7,6 +7,9 @@ from app.core.database import get_db
 from app.schemas.activity import ActivityCreate, ActivityResponse, ActivityUpdate
 from app.services import activity as activity_service
 from app.services.geocoding import geocode_location
+from app.schemas.weather import WeatherResponse
+from app.services.weather import get_weather_forecast
+from datetime import timedelta
 
 router = APIRouter(
     prefix="/activities",
@@ -115,6 +118,59 @@ def update_activity(
         data["longitude"] = location.longitude
 
     return activity_service.update_activity(db, activity, data)
+
+
+@router.get(
+    "/{activity_id}/weather",
+    response_model=WeatherResponse,
+)
+def get_activity_weather(
+    activity_id: int,
+    db: Session = Depends(get_db),
+):
+    activity = activity_service.get_activity(db, activity_id)
+
+    if activity is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Atividade não encontrada.",
+        )
+
+    try:
+        weather = get_weather_forecast(
+            latitude=float(activity.latitude),
+            longitude=float(activity.longitude),
+            scheduled_date=activity.scheduled_date,
+            scheduled_time=activity.scheduled_time,
+        )
+    except httpx2.HTTPError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço meteorológico temporariamente indisponível.",
+        )
+
+    if weather is None:
+        available_from = activity.scheduled_date - timedelta(days=15)
+
+        return WeatherResponse(
+            available=False,
+            message=(
+                "A previsão meteorológica ainda não está disponível. "
+                "Consulte novamente a partir da data indicada."
+            ),
+            available_from=available_from,
+        )
+
+    return WeatherResponse(
+        available=True,
+        temperature=weather.temperature,
+        apparent_temperature=weather.apparent_temperature,
+        precipitation_probability=weather.precipitation_probability,
+        precipitation=weather.precipitation,
+        weather_code=weather.weather_code,
+        wind_speed=weather.wind_speed,
+        wind_gusts=weather.wind_gusts,
+    )
 
 
 @router.delete(
