@@ -1,9 +1,12 @@
+import httpx2
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.activity import ActivityCreate, ActivityResponse, ActivityUpdate
 from app.services import activity as activity_service
+from app.services.geocoding import geocode_location
 
 router = APIRouter(
     prefix="/activities",
@@ -49,10 +52,25 @@ def create_activity(
     payload: ActivityCreate,
     db: Session = Depends(get_db),
 ):
+    try:
+        location = geocode_location(payload.location_name)
+    except httpx2.HTTPError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de localização temporariamente indisponível.",
+        )
+
+    if location is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Não foi possível encontrar o local informado.",
+        )
+
     data = payload.model_dump()
 
-    data["latitude"] = 38.722252
-    data["longitude"] = -9.139337
+    data["location_name"] = location.name
+    data["latitude"] = location.latitude
+    data["longitude"] = location.longitude
 
     return activity_service.create_activity(db, data)
 
@@ -61,6 +79,7 @@ def create_activity(
     "/{activity_id}",
     response_model=ActivityResponse,
 )
+@router.patch("/{activity_id}", response_model=ActivityResponse)
 def update_activity(
     activity_id: int,
     payload: ActivityUpdate,
@@ -76,11 +95,26 @@ def update_activity(
 
     data = payload.model_dump(exclude_unset=True)
 
-    return activity_service.update_activity(
-        db,
-        activity,
-        data,
-    )
+    if "location_name" in data:
+        try:
+            location = geocode_location(data["location_name"])
+        except httpx2.HTTPError:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Serviço de localização temporariamente indisponível.",
+            )
+
+        if location is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Não foi possível encontrar o local informado.",
+            )
+
+        data["location_name"] = location.name
+        data["latitude"] = location.latitude
+        data["longitude"] = location.longitude
+
+    return activity_service.update_activity(db, activity, data)
 
 
 @router.delete(
