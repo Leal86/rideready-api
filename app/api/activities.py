@@ -17,6 +17,7 @@ from app.services.locations import search_locations
 from app.schemas.weather import WeatherResponse
 from app.services.weather import get_weather_forecast
 from datetime import datetime, timedelta
+from app.services.assessment import assess_weather_conditions
 
 router = APIRouter(
     prefix="/activities",
@@ -216,6 +217,15 @@ def get_activity_weather(
             available_from=available_from,
         )
 
+    assessment = assess_weather_conditions(
+        activity_type=activity.activity_type,
+        apparent_temperature=weather.apparent_temperature,
+        precipitation_probability=weather.precipitation_probability,
+        precipitation=weather.precipitation,
+        wind_speed=weather.wind_speed,
+        wind_gusts=weather.wind_gusts,
+)
+
     return WeatherResponse(
         available=True,
         temperature=weather.temperature,
@@ -225,6 +235,10 @@ def get_activity_weather(
         weather_code=weather.weather_code,
         wind_speed=weather.wind_speed,
         wind_gusts=weather.wind_gusts,
+        assessment={
+            "level": assessment.level,
+            "reasons": assessment.reasons,
+        },
     )
 
 

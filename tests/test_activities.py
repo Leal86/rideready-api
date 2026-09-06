@@ -291,6 +291,10 @@ def test_get_activity_weather_available(monkeypatch):
     assert data["weather_code"] == 0
     assert data["wind_speed"] == 2.9
     assert data["wind_gusts"] == 6.5
+    assert data["assessment"]["level"] == "FAVORABLE"
+    assert data["assessment"]["reasons"] == [
+    "Nenhuma condição meteorológica relevante de atenção foi identificada."
+]
 
 
 def test_get_activity_weather_unavailable(monkeypatch):
@@ -333,6 +337,7 @@ def test_get_activity_weather_unavailable(monkeypatch):
     assert data["available_from"] == "2026-10-05"
     assert data["temperature"] is None
     assert data["wind_speed"] is None
+    assert data["assessment"] is None
 
 
 def test_get_activity_weather_not_found():

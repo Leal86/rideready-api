@@ -1,6 +1,19 @@
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel
+
+
+AssessmentLevel = Literal[
+    "FAVORABLE",
+    "CAUTION",
+    "UNFAVORABLE",
+]
+
+
+class WeatherAssessmentResponse(BaseModel):
+    level: AssessmentLevel
+    reasons: list[str]
 
 
 class WeatherResponse(BaseModel):
@@ -14,3 +27,4 @@ class WeatherResponse(BaseModel):
     weather_code: int | None = None
     wind_speed: float | None = None
     wind_gusts: float | None = None
+    assessment: WeatherAssessmentResponse | None = None
