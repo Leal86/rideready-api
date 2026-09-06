@@ -283,6 +283,7 @@ def test_get_activity_weather_available(monkeypatch):
 
     data = response.json()
 
+    assert data["checked_at"] is not None
     assert data["available"] is True
     assert data["temperature"] == 23.6
     assert data["apparent_temperature"] == 26.7
@@ -333,6 +334,7 @@ def test_get_activity_weather_unavailable(monkeypatch):
 
     data = response.json()
 
+    assert data["checked_at"] is None
     assert data["available"] is False
     assert data["available_from"] == "2026-10-05"
     assert data["temperature"] is None

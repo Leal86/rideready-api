@@ -228,6 +228,7 @@ def get_activity_weather(
 
     return WeatherResponse(
         available=True,
+        checked_at=datetime.now().astimezone(),
         temperature=weather.temperature,
         apparent_temperature=weather.apparent_temperature,
         precipitation_probability=weather.precipitation_probability,
