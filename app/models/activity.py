@@ -1,7 +1,18 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, Index, Numeric, String, Text, Time, func
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    Time,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -70,6 +81,56 @@ class Activity(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+    weather_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    weather_temperature: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2),
+        nullable=True,
+    )
+
+    weather_apparent_temperature: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2),
+        nullable=True,
+    )
+
+    weather_precipitation_probability: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    weather_precipitation: Mapped[Decimal | None] = mapped_column(
+        Numeric(6, 2),
+        nullable=True,
+    )
+
+    weather_code: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    weather_wind_speed: Mapped[Decimal | None] = mapped_column(
+        Numeric(6, 2),
+        nullable=True,
+    )
+
+    weather_wind_gusts: Mapped[Decimal | None] = mapped_column(
+        Numeric(6, 2),
+        nullable=True,
+    )
+
+    weather_assessment_level: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    weather_assessment_reasons: Mapped[list[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
     )
 
     __table_args__ = (

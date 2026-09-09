@@ -69,10 +69,9 @@ def create_activity(
         payload.scheduled_time,
     )
 
-
     if scheduled_datetime < datetime.now():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={
                 "field": "scheduled_datetime",
                 "message": "A data e a hora da atividade não podem estar no passado.",
@@ -131,7 +130,6 @@ def create_activity(
     "/{activity_id}",
     response_model=ActivityResponse,
 )
-
 def update_activity(
     activity_id: int,
     payload: ActivityUpdate,
@@ -146,6 +144,56 @@ def update_activity(
         )
 
     data = payload.model_dump(exclude_unset=True)
+
+    weather_relevant_fields = {
+        "location_name",
+        "scheduled_date",
+        "scheduled_time",
+        "activity_type",
+    }
+
+    if weather_relevant_fields.intersection(data):
+        data.update(
+            {
+                "weather_checked_at": None,
+                "weather_temperature": None,
+                "weather_apparent_temperature": None,
+                "weather_precipitation_probability": None,
+                "weather_precipitation": None,
+                "weather_code": None,
+                "weather_wind_speed": None,
+                "weather_wind_gusts": None,
+                "weather_assessment_level": None,
+                "weather_assessment_reasons": None,
+            }
+        )
+
+    if data.get("status") == "COMPLETED":
+        scheduled_date = data.get(
+            "scheduled_date",
+            activity.scheduled_date,
+        )
+        scheduled_time = data.get(
+            "scheduled_time",
+            activity.scheduled_time,
+        )
+
+        scheduled_datetime = datetime.combine(
+            scheduled_date,
+            scheduled_time,
+        )
+
+        if scheduled_datetime > datetime.now():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "field": "status",
+                    "message": (
+                        "A atividade só pode ser concluída "
+                        "a partir da data e hora agendadas."
+                    ),
+                },
+            )
 
     if "location_name" in data:
         try:
@@ -180,6 +228,8 @@ def update_activity(
     "/{activity_id}/weather",
     response_model=WeatherResponse,
 )
+
+
 def get_activity_weather(
     activity_id: int,
     db: Session = Depends(get_db),
@@ -190,6 +240,15 @@ def get_activity_weather(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Atividade não encontrada.",
+        )
+
+    if activity.status != "PLANNED":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "A previsão meteorológica só pode ser atualizada "
+                "para atividades planeadas."
+            ),
         )
 
     try:
@@ -224,11 +283,34 @@ def get_activity_weather(
         precipitation=weather.precipitation,
         wind_speed=weather.wind_speed,
         wind_gusts=weather.wind_gusts,
-)
+    )
+
+    checked_at = datetime.now().astimezone()
+
+    snapshot_data = {
+        "weather_checked_at": checked_at,
+        "weather_temperature": weather.temperature,
+        "weather_apparent_temperature": weather.apparent_temperature,
+        "weather_precipitation_probability": (
+            weather.precipitation_probability
+        ),
+        "weather_precipitation": weather.precipitation,
+        "weather_code": weather.weather_code,
+        "weather_wind_speed": weather.wind_speed,
+        "weather_wind_gusts": weather.wind_gusts,
+        "weather_assessment_level": assessment.level,
+        "weather_assessment_reasons": assessment.reasons,
+    }
+
+    activity_service.update_activity(
+        db,
+        activity,
+        snapshot_data,
+    )
 
     return WeatherResponse(
         available=True,
-        checked_at=datetime.now().astimezone(),
+        checked_at=checked_at,
         temperature=weather.temperature,
         apparent_temperature=weather.apparent_temperature,
         precipitation_probability=weather.precipitation_probability,

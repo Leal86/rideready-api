@@ -52,3 +52,14 @@ class ActivityResponse(ActivityBase):
     status: ActivityStatus
     created_at: datetime
     updated_at: datetime
+
+    weather_checked_at: datetime | None = None
+    weather_temperature: float | None = None
+    weather_apparent_temperature: float | None = None
+    weather_precipitation_probability: int | None = None
+    weather_precipitation: float | None = None
+    weather_code: int | None = None
+    weather_wind_speed: float | None = None
+    weather_wind_gusts: float | None = None
+    weather_assessment_level: str | None = None
+    weather_assessment_reasons: list[str] | None = None
