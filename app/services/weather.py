@@ -3,12 +3,23 @@ from datetime import date, time
 
 import httpx2
 
-
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
 
 @dataclass
 class WeatherResult:
+    temperature: float
+    apparent_temperature: float
+    precipitation_probability: int
+    precipitation: float
+    weather_code: int
+    wind_speed: float
+    wind_gusts: float
+
+
+@dataclass
+class CurrentWeatherResult:
+    observed_at: str
     temperature: float
     apparent_temperature: float
     precipitation_probability: int
@@ -61,8 +72,7 @@ def get_weather_forecast(
     )
 
     target_datetime = (
-        f"{scheduled_date.isoformat()}T"
-        f"{target_hour.strftime('%H:%M')}"
+        f"{scheduled_date.isoformat()}T" f"{target_hour.strftime('%H:%M')}"
     )
 
     try:
@@ -73,11 +83,79 @@ def get_weather_forecast(
     return WeatherResult(
         temperature=hourly["temperature_2m"][index],
         apparent_temperature=hourly["apparent_temperature"][index],
-        precipitation_probability=hourly[
-            "precipitation_probability"
-        ][index],
+        precipitation_probability=hourly["precipitation_probability"][index],
         precipitation=hourly["precipitation"][index],
         weather_code=hourly["weather_code"][index],
         wind_speed=hourly["wind_speed_10m"][index],
         wind_gusts=hourly["wind_gusts_10m"][index],
+    )
+
+
+def get_current_weather(
+    latitude: float,
+    longitude: float,
+) -> CurrentWeatherResult | None:
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": (
+            "temperature_2m,"
+            "apparent_temperature,"
+            "precipitation,"
+            "weather_code,"
+            "wind_speed_10m,"
+            "wind_gusts_10m"
+        ),
+        "hourly": "precipitation_probability",
+        "forecast_days": 1,
+        "timezone": "auto",
+    }
+
+    response = httpx2.get(
+        FORECAST_URL,
+        params=params,
+        timeout=10.0,
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    current = data.get("current")
+    hourly = data.get("hourly")
+
+    if not current:
+        return None
+
+    observed_at = current.get("time")
+
+    if not observed_at:
+        return None
+
+    precipitation_probability = 0
+
+    if hourly:
+        hourly_times = hourly.get("time", [])
+        hourly_probabilities = hourly.get(
+            "precipitation_probability",
+            [],
+        )
+
+        current_hour = observed_at[:13] + ":00"
+
+        try:
+            index = hourly_times.index(current_hour)
+            precipitation_probability = hourly_probabilities[index]
+        except (ValueError, IndexError):
+            precipitation_probability = 0
+
+    return CurrentWeatherResult(
+        observed_at=observed_at,
+        temperature=current["temperature_2m"],
+        apparent_temperature=current["apparent_temperature"],
+        precipitation_probability=precipitation_probability,
+        precipitation=current["precipitation"],
+        weather_code=current["weather_code"],
+        wind_speed=current["wind_speed_10m"],
+        wind_gusts=current["wind_gusts_10m"],
     )

@@ -10,3 +10,10 @@ class LocationSuggestionResponse(BaseModel):
     latitude: float
     longitude: float
     formatted: str
+
+
+class ReverseLocationResponse(BaseModel):
+    city: str | None
+    state: str | None
+    country: str
+    formatted: str

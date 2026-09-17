@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.activities import router as activities_router
 from app.api.locations import router as locations_router
+from app.api.weather import router as weather_router
 
 app = FastAPI(
     title="RideReady API",
@@ -24,6 +25,7 @@ app.add_middleware(
 
 app.include_router(activities_router)
 app.include_router(locations_router)
+app.include_router(weather_router)
 
 
 @app.get("/")

@@ -29,3 +29,14 @@ class WeatherResponse(BaseModel):
     wind_speed: float | None = None
     wind_gusts: float | None = None
     assessment: WeatherAssessmentResponse | None = None
+
+
+class CurrentWeatherResponse(BaseModel):
+    observed_at: str
+    temperature: float
+    apparent_temperature: float
+    precipitation_probability: int
+    precipitation: float
+    weather_code: int
+    wind_speed: float
+    wind_gusts: float

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,6 +6,11 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services.locations import LocationSuggestion
 from app.services.weather import WeatherResult
+
+TODAY = date.today()
+FUTURE_DATE = TODAY + timedelta(days=7)
+FAR_FUTURE_DATE = TODAY + timedelta(days=60)
+PAST_DATE = TODAY - timedelta(days=7)
 
 client = TestClient(app)
 
@@ -100,7 +105,7 @@ def test_create_activity():
         "title": "Caminhada de Teste",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-10",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "10:00:00",
         "notes": "Criada pelo pytest",
     }
@@ -127,7 +132,7 @@ def test_get_activity_by_id():
         "title": "Corrida de Teste",
         "activity_type": "RUNNING",
         "location_name": "Porto",
-        "scheduled_date": "2026-09-11",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "09:00:00",
         "notes": "Teste de consulta por ID",
     }
@@ -165,7 +170,7 @@ def test_update_activity():
         "title": "Atividade para Atualizar",
         "activity_type": "HIKING",
         "location_name": "Sintra",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "08:30:00",
         "notes": "Antes da atualização",
     }
@@ -207,7 +212,7 @@ def test_cannot_complete_future_activity():
         "title": "Atividade Futura",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-11-20",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "10:00:00",
         "notes": "Teste de conclusão antecipada",
     }
@@ -248,7 +253,7 @@ def test_can_complete_activity_when_same_patch_moves_it_to_past():
         "title": "Atividade para Conclusão",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "13:00:00",
         "notes": "Teste de alteração de data e estado",
     }
@@ -265,7 +270,7 @@ def test_can_complete_activity_when_same_patch_moves_it_to_past():
     update_response = client.patch(
         f"/activities/{activity_id}",
         json={
-            "scheduled_date": "2026-09-08",
+            "scheduled_date": PAST_DATE.isoformat(),
             "status": "COMPLETED",
         },
     )
@@ -274,7 +279,7 @@ def test_can_complete_activity_when_same_patch_moves_it_to_past():
 
     activity = update_response.json()
 
-    assert activity["scheduled_date"] == "2026-09-08"
+    assert activity["scheduled_date"] == PAST_DATE.isoformat()
     assert activity["status"] == "COMPLETED"
 
 
@@ -297,7 +302,7 @@ def test_delete_activity():
         "title": "Atividade para Eliminar",
         "activity_type": "CYCLING",
         "location_name": "Cascais",
-        "scheduled_date": "2026-09-13",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "11:00:00",
         "notes": "Será eliminada pelo teste",
     }
@@ -332,7 +337,7 @@ def test_create_activity_invalid_payload():
         "title": "A",
         "activity_type": "SWIMMING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-10",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "10:00:00",
     }
 
@@ -350,7 +355,7 @@ def test_get_activity_weather_available(monkeypatch):
         "title": "Caminhada com Previsão",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "09:30:00",
         "notes": "Teste de previsão disponível",
     }
@@ -412,7 +417,7 @@ def test_weather_query_persists_latest_snapshot(monkeypatch):
         "title": "Caminhada com Snapshot",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "10:00:00",
         "notes": "Teste de persistência meteorológica",
     }
@@ -484,7 +489,7 @@ def test_new_weather_query_replaces_previous_snapshot(monkeypatch):
         "title": "Caminhada com Atualização Meteorológica",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "11:00:00",
         "notes": "Teste de substituição do snapshot meteorológico",
     }
@@ -580,7 +585,7 @@ def test_activity_change_invalidates_weather_snapshot(monkeypatch):
         "title": "Caminhada para Editar",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "12:00:00",
         "notes": "Teste de invalidação do snapshot",
     }
@@ -654,7 +659,7 @@ def test_get_activity_weather_unavailable(monkeypatch):
         "title": "Caminhada Futura",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-10-20",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "09:00:00",
         "notes": "Teste fora do horizonte",
     }
@@ -687,7 +692,7 @@ def test_get_activity_weather_unavailable(monkeypatch):
 
     assert data["checked_at"] is None
     assert data["available"] is False
-    assert data["available_from"] == "2026-10-05"
+    assert data["available_from"] == (FUTURE_DATE - timedelta(days=15)).isoformat()
     assert data["temperature"] is None
     assert data["wind_speed"] is None
     assert data["assessment"] is None
@@ -700,7 +705,7 @@ def test_completed_activity_cannot_refresh_weather():
         "title": "Caminhada Concluída",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "13:00:00",
         "notes": "Teste de bloqueio meteorológico",
     }
@@ -717,7 +722,7 @@ def test_completed_activity_cannot_refresh_weather():
     date_update_response = client.patch(
         f"/activities/{activity_id}",
         json={
-            "scheduled_date": "2026-09-08",
+            "scheduled_date": PAST_DATE.isoformat(),
         },
     )
 
@@ -747,7 +752,7 @@ def test_cancelled_activity_cannot_refresh_weather():
         "title": "Caminhada Cancelada",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-09-12",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "14:00:00",
         "notes": "Teste de bloqueio meteorológico",
     }
@@ -792,7 +797,7 @@ def test_create_activity_schedule_conflict():
         "title": "Primeira Atividade no Horário",
         "activity_type": "WALKING",
         "location_name": "Lisboa",
-        "scheduled_date": "2026-11-15",
+        "scheduled_date": FUTURE_DATE.isoformat(),
         "scheduled_time": "15:30:00",
         "notes": "Teste de conflito de horário",
     }

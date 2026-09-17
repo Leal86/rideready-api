@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import httpx2
 
 GEOAPIFY_AUTOCOMPLETE_URL = "https://api.geoapify.com/v1/geocode/autocomplete"
+GEOAPIFY_REVERSE_URL = "https://api.geoapify.com/v1/geocode/reverse"
 
 
 @dataclass
@@ -15,6 +16,14 @@ class LocationSuggestion:
     country_code: str
     latitude: float
     longitude: float
+    formatted: str
+
+
+@dataclass
+class ReverseLocation:
+    city: str | None
+    state: str | None
+    country: str
     formatted: str
 
 
@@ -113,3 +122,73 @@ def search_locations(query: str) -> list[LocationSuggestion]:
             unique_suggestions.append(suggestion)
 
     return unique_suggestions
+
+
+def reverse_location(
+    latitude: float,
+    longitude: float,
+) -> ReverseLocation | None:
+    api_key = os.getenv("GEOAPIFY_API_KEY")
+
+    if not api_key:
+        raise RuntimeError("GEOAPIFY_API_KEY não está configurada.")
+
+    params = {
+        "lat": latitude,
+        "lon": longitude,
+        "format": "json",
+        "lang": "pt",
+        "apiKey": api_key,
+    }
+
+    response = httpx2.get(
+        GEOAPIFY_REVERSE_URL,
+        params=params,
+        timeout=10.0,
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+    results = data.get("results", [])
+
+    if not results:
+        return None
+
+    item = results[0]
+
+    city = (
+        item.get("city")
+        or item.get("town")
+        or item.get("village")
+        or item.get("municipality")
+    )
+
+    state = item.get("state")
+    country = item.get("country", "")
+
+    display_parts = []
+
+    if city:
+        display_parts.append(city)
+
+    if state:
+        normalized_parts = [part.lower() for part in display_parts]
+
+        if state.lower() not in normalized_parts:
+            display_parts.append(state)
+
+    if country:
+        normalized_parts = [part.lower() for part in display_parts]
+
+        if country.lower() not in normalized_parts:
+            display_parts.append(country)
+
+    formatted = ", ".join(display_parts)
+
+    return ReverseLocation(
+        city=city,
+        state=state,
+        country=country,
+        formatted=formatted,
+    )
