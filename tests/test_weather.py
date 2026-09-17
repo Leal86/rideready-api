@@ -101,3 +101,27 @@ def test_get_current_weather_service_unavailable(monkeypatch):
     assert response.json() == {
         "detail": "Serviço meteorológico temporariamente indisponível."
     }
+
+
+def test_get_current_weather_returns_503_when_conditions_are_unavailable(
+    monkeypatch,
+):
+    """Retorna 503 quando não existem condições meteorológicas utilizáveis."""
+
+    monkeypatch.setattr(
+        "app.api.weather.get_current_weather",
+        lambda latitude, longitude: None,
+    )
+
+    response = client.get(
+        "/weather/current",
+        params={
+            "latitude": 38.7223,
+            "longitude": -9.1393,
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Não foi possível obter as condições meteorológicas atuais."
+    }

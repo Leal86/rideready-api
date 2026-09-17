@@ -79,6 +79,28 @@ def test_search_locations_not_configured(monkeypatch):
     )
 
 
+def test_search_locations_service_unavailable(monkeypatch):
+    """Retorna 503 quando o serviço externo de pesquisa de locais falha."""
+
+    def fake_search_locations(query):
+        raise httpx2.HTTPError("Geoapify indisponível")
+
+    monkeypatch.setattr(
+        "app.api.locations.search_locations",
+        fake_search_locations,
+    )
+
+    response = client.get(
+        "/locations/search",
+        params={"q": "Lisboa"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Serviço de pesquisa de locais temporariamente indisponível."
+    }
+
+
 def test_reverse_location(monkeypatch):
     """Confirma que coordenadas válidas devolvem a localização formatada."""
 

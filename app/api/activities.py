@@ -111,7 +111,7 @@ def create_activity(
 
     if not locations:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Não foi possível encontrar o local informado.",
         )
 
@@ -211,7 +211,7 @@ def update_activity(
 
         if not locations:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Não foi possível encontrar o local informado.",
             )
 

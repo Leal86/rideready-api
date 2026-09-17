@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
@@ -206,6 +207,127 @@ def test_update_activity():
     assert data["location_name"] == "Sintra, Portugal"
 
 
+def test_update_activity_returns_503_when_location_service_fails(
+    monkeypatch,
+):
+    """Retorna 503 quando o Geoapify falha durante a alteração do local."""
+
+    payload = {
+        "title": "Atividade para Falha de Localização",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "16:00:00",
+        "notes": "Teste de indisponibilidade durante edição",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    def fake_search_locations(location_name):
+        raise httpx2.HTTPError("Geoapify indisponível")
+
+    monkeypatch.setattr(
+        "app.api.activities.search_locations",
+        fake_search_locations,
+    )
+
+    response = client.patch(
+        f"/activities/{activity_id}",
+        json={"location_name": "Porto"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Serviço de localização temporariamente indisponível."
+    }
+
+
+def test_update_activity_returns_503_when_location_service_is_not_configured(
+    monkeypatch,
+):
+    """Retorna 503 quando o Geoapify não está configurado durante a edição."""
+
+    payload = {
+        "title": "Atividade para Teste de Configuração",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "17:00:00",
+        "notes": "Teste de configuração durante edição",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    def fake_search_locations(location_name):
+        raise RuntimeError("GEOAPIFY_API_KEY não configurada")
+
+    monkeypatch.setattr(
+        "app.api.activities.search_locations",
+        fake_search_locations,
+    )
+
+    response = client.patch(
+        f"/activities/{activity_id}",
+        json={"location_name": "Porto"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Serviço de localização não está configurado."}
+
+
+def test_update_activity_returns_422_when_location_is_not_found(
+    monkeypatch,
+):
+    """Retorna 422 quando o novo local não pode ser encontrado."""
+
+    payload = {
+        "title": "Atividade para Local Inválido",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "18:00:00",
+        "notes": "Teste de local inexistente durante edição",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    monkeypatch.setattr(
+        "app.api.activities.search_locations",
+        lambda location_name: [],
+    )
+
+    response = client.patch(
+        f"/activities/{activity_id}",
+        json={"location_name": "Local inexistente"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "Não foi possível encontrar o local informado."
+    }
+
+
 def test_cannot_complete_future_activity():
 
     payload = {
@@ -329,6 +451,126 @@ def test_delete_activity_not_found():
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Atividade não encontrada."}
+
+
+def test_cannot_create_activity_in_the_past():
+    """Impede a criação de uma atividade com data e hora já passadas."""
+
+    payload = {
+        "title": "Atividade no Passado",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": PAST_DATE.isoformat(),
+        "scheduled_time": "10:00:00",
+        "notes": "Teste de validação temporal",
+    }
+
+    response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": {
+            "field": "scheduled_datetime",
+            "message": ("A data e a hora da atividade não podem estar no passado."),
+        }
+    }
+
+
+def test_create_activity_returns_503_when_location_service_fails(
+    monkeypatch,
+):
+    """Retorna 503 quando o Geoapify falha durante a criação."""
+
+    def fake_search_locations(location_name):
+        raise httpx2.HTTPError("Geoapify indisponível")
+
+    monkeypatch.setattr(
+        "app.api.activities.search_locations",
+        fake_search_locations,
+    )
+
+    payload = {
+        "title": "Caminhada com Falha de Localização",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "10:00:00",
+        "notes": "Teste de indisponibilidade do Geoapify",
+    }
+
+    response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Serviço de localização temporariamente indisponível."
+    }
+
+
+def test_create_activity_returns_503_when_location_service_is_not_configured(
+    monkeypatch,
+):
+    """Retorna 503 quando o Geoapify não está configurado."""
+
+    def fake_search_locations(location_name):
+        raise RuntimeError("GEOAPIFY_API_KEY não configurada")
+
+    monkeypatch.setattr(
+        "app.api.activities.search_locations",
+        fake_search_locations,
+    )
+
+    payload = {
+        "title": "Caminhada sem Configuração",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "11:00:00",
+        "notes": "Teste de configuração do Geoapify",
+    }
+
+    response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Serviço de localização não está configurado."}
+
+
+def test_create_activity_returns_422_when_location_is_not_found(
+    monkeypatch,
+):
+    """Retorna 422 quando o local informado não pode ser encontrado."""
+
+    monkeypatch.setattr(
+        "app.api.activities.search_locations",
+        lambda location_name: [],
+    )
+
+    payload = {
+        "title": "Caminhada em Local Desconhecido",
+        "activity_type": "WALKING",
+        "location_name": "Local inexistente",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "12:00:00",
+        "notes": "Teste de localização inexistente",
+    }
+
+    response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "Não foi possível encontrar o local informado."
+    }
 
 
 def test_create_activity_invalid_payload():
@@ -696,6 +938,50 @@ def test_get_activity_weather_unavailable(monkeypatch):
     assert data["temperature"] is None
     assert data["wind_speed"] is None
     assert data["assessment"] is None
+
+
+def test_get_activity_weather_returns_503_when_weather_service_fails(
+    monkeypatch,
+):
+    """Retorna 503 quando o Open-Meteo falha ao consultar a previsão."""
+
+    payload = {
+        "title": "Caminhada com Falha Meteorológica",
+        "activity_type": "WALKING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "19:00:00",
+        "notes": "Teste de indisponibilidade do Open-Meteo",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    def fake_weather_forecast(
+        latitude,
+        longitude,
+        scheduled_date,
+        scheduled_time,
+    ):
+        raise httpx2.HTTPError("Open-Meteo indisponível")
+
+    monkeypatch.setattr(
+        "app.api.activities.get_weather_forecast",
+        fake_weather_forecast,
+    )
+
+    response = client.get(f"/activities/{activity_id}/weather")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Serviço meteorológico temporariamente indisponível."
+    }
 
 
 def test_completed_activity_cannot_refresh_weather():
