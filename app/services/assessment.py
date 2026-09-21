@@ -63,12 +63,9 @@ def assess_weather_conditions(
             "Precipitação moderada prevista."
         )
 
-    if activity_type == "CYCLING":
-        caution_wind = 25
-        unfavorable_wind = 40
-    else:
-        caution_wind = 30
-        unfavorable_wind = 45
+    caution_wind, unfavorable_wind = (
+        (25, 40) if activity_type == "CYCLING" else (30, 45)
+    )
 
     if wind_speed >= unfavorable_wind:
         unfavorable_reasons.append(
