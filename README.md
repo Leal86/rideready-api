@@ -211,15 +211,17 @@ Quando a atividade está fora do horizonte disponível de previsão, a API infor
 
 ## APIs externas
 
+As APIs externas são consumidas pelo backend do RideReady através de requisições HTTP. Os dados recebidos são tratados pela aplicação antes de serem apresentados ao utilizador, sem redirecionamento para aplicações externas.
+
 ### Geoapify
 
 O RideReady utiliza a **Geoapify Geocoding API** para pesquisa de localidades, autocomplete e geocodificação reversa.
 
-Funções utilizadas:
+Endpoints externos utilizados:
 
 ```text
-GET /v1/geocode/autocomplete
-GET /v1/geocode/reverse
+GET https://api.geoapify.com/v1/geocode/autocomplete
+GET https://api.geoapify.com/v1/geocode/reverse
 ```
 
 A integração requer uma chave de API configurada através da variável:
@@ -228,7 +230,7 @@ A integração requer uma chave de API configurada através da variável:
 GEOAPIFY_API_KEY
 ```
 
-É necessário criar uma conta/projeto na Geoapify para obter a chave utilizada pela aplicação.
+Para obter a chave é necessário criar uma conta e um projeto na Geoapify. O serviço disponibiliza um plano gratuito, sujeito aos limites definidos pela Geoapify.
 
 Site oficial:
 
@@ -242,45 +244,56 @@ Documentação:
 https://apidocs.geoapify.com/
 ```
 
-A utilização do serviço está sujeita aos termos e limites do plano escolhido na Geoapify.
+Planos e condições de utilização:
+
+```text
+https://www.geoapify.com/pricing/
+```
+
+A utilização da Geoapify está sujeita aos termos, limites e requisitos de atribuição aplicáveis ao plano utilizado.
 
 ### Open-Meteo
 
-O RideReady utiliza a **Open-Meteo Weather API** para obter condições meteorológicas atuais e previsões.
+O RideReady utiliza a **Open-Meteo Weather API** para obter condições meteorológicas atuais e previsões utilizadas no planeamento das atividades.
 
-Endpoint utilizado:
+Endpoint externo utilizado:
 
 ```text
 GET https://api.open-meteo.com/v1/forecast
 ```
 
-A integração utilizada pelo projeto não necessita de chave de API.
+Para utilização gratuita não comercial, a integração não necessita de chave de API nem de cadastro.
 
-Site e documentação:
+Os dados meteorológicos disponibilizados pelo Open-Meteo estão sujeitos à licença **Creative Commons Attribution 4.0 International (CC BY 4.0)**, que requer atribuição da fonte.
+
+Site oficial:
 
 ```text
 https://open-meteo.com/
+```
+
+Documentação:
+
+```text
 https://open-meteo.com/en/docs
 ```
 
-Os dados meteorológicos disponibilizados pelo Open-Meteo estão sujeitos às condições e licenças indicadas pelo próprio serviço.
+Termos e condições de utilização:
+
+```text
+https://open-meteo.com/en/terms
+```
 
 ## Configuração do ambiente
 
 Crie um ficheiro `.env` na raiz do projeto com base no `.env.example`:
 
 ```env
-DATABASE_URL=postgresql+psycopg://rideready:rideready@localhost:5432/rideready
+DATABASE_URL=postgresql+psycopg://<usuario>:<password>@localhost:5432/rideready
 GEOAPIFY_API_KEY=your_geoapify_api_key_here
 ```
 
-Substitua:
-
-```text
-your_geoapify_api_key_here
-```
-
-pela chave obtida na Geoapify.
+Substitua os valores de exemplo pelas credenciais do PostgreSQL configurado no seu ambiente e pela chave obtida na Geoapify.
 
 O ficheiro `.env` não deve ser enviado para o repositório Git.
 
@@ -312,21 +325,11 @@ Crie o `.env` conforme descrito anteriormente.
 
 ### 5. Disponibilizar o PostgreSQL
 
-A aplicação espera, por defeito, uma base de dados PostgreSQL acessível em:
+Disponibilize uma instância PostgreSQL acessível pela aplicação e configure a ligação através da variável:
 
 ```text
-localhost:5432
+DATABASE_URL
 ```
-
-com:
-
-```text
-database: rideready
-user: rideready
-password: rideready
-```
-
-Esses valores podem ser alterados através da variável `DATABASE_URL`.
 
 ### 6. Executar as migrations
 
@@ -453,15 +456,6 @@ Por defeito, a API permite requisições CORS provenientes do frontend executado
 ```text
 http://localhost:5173
 ```
-
-## Licença e utilização das APIs externas
-
-Este projeto foi desenvolvido para fins académicos.
-
-As APIs externas permanecem sujeitas às suas próprias condições de utilização, licenciamento, atribuição e limites de consumo:
-
-- **Geoapify** — consultar os termos e condições aplicáveis ao serviço e ao plano utilizado.
-- **Open-Meteo** — consultar a documentação e as condições de utilização e atribuição dos dados meteorológicos.
 
 ## Projeto académico
 
