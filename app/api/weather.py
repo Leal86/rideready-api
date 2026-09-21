@@ -1,3 +1,5 @@
+from typing import Annotated
+
 import httpx2
 from fastapi import APIRouter, HTTPException, Query, status
 
@@ -16,8 +18,8 @@ router = APIRouter(
     response_model=CurrentWeatherResponse,
 )
 def get_current_weather_conditions(
-    latitude: float = Query(..., ge=-90, le=90),
-    longitude: float = Query(..., ge=-180, le=180),
+    latitude: Annotated[float, Query(ge=-90, le=90)],
+    longitude: Annotated[float, Query(ge=-180, le=180)],
 ):
     try:
         weather = get_current_weather(
