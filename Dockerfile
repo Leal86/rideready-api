@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --only-binary=:all: -r requirements.txt
+RUN pip install --no-cache-dir --only-binary=:all: --require-hashes -r requirements.txt
 
 COPY alembic.ini .
 COPY alembic ./alembic
