@@ -27,6 +27,35 @@ class ReverseLocation:
     formatted: str
 
 
+def _format_location_parts(
+    name: str,
+    city: str | None,
+    state: str | None,
+    country: str,
+) -> str:
+    display_parts = []
+
+    if name:
+        display_parts.append(name)
+
+    if city and city.lower() != name.lower():
+        display_parts.append(city)
+
+    if state:
+        normalized_parts = [part.lower() for part in display_parts]
+
+        if state.lower() not in normalized_parts:
+            display_parts.append(state)
+
+    if country:
+        normalized_parts = [part.lower() for part in display_parts]
+
+        if country.lower() not in normalized_parts:
+            display_parts.append(country)
+
+    return ", ".join(display_parts)
+
+
 def search_locations(query: str) -> list[LocationSuggestion]:
     api_key = os.getenv("GEOAPIFY_API_KEY")
 
@@ -73,27 +102,12 @@ def search_locations(query: str) -> list[LocationSuggestion]:
         state = item.get("state")
         country = item.get("country", "")
 
-        display_parts = []
-
-        if name:
-            display_parts.append(name)
-
-        if city and city.lower() != name.lower():
-            display_parts.append(city)
-
-        if state:
-            normalized_parts = [part.lower() for part in display_parts]
-
-            if state.lower() not in normalized_parts:
-                display_parts.append(state)
-
-        if country:
-            normalized_parts = [part.lower() for part in display_parts]
-
-            if country.lower() not in normalized_parts:
-                display_parts.append(country)
-
-        formatted = ", ".join(display_parts)
+        formatted = _format_location_parts(
+            name,
+            city,
+            state,
+            country,
+        )
 
         suggestions.append(
             LocationSuggestion(
