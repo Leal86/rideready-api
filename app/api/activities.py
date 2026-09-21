@@ -90,9 +90,7 @@ def create_activity(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
-                    "message": (
-                        "Já existe uma atividade marcada " "para esta data e hora."
-                    ),
+                    "message": "Já existe uma atividade marcada para esta data e hora.",
                     "conflicting_activity_id": conflicting_activity.id,
                     "conflicting_activity_title": conflicting_activity.title,
                 },
