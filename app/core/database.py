@@ -6,11 +6,13 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 load_dotenv()
 
-# Procura uma variável de ambiente chamada "DATABASE_URL" e, se não encontrar, usa a URL padrão para o banco de dados PostgreSQL.
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://rideready:rideready@localhost:5432/rideready",
-)
+# Obtém a URL de conexão com o PostgreSQL a partir das variáveis de ambiente.
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "A variável de ambiente DATABASE_URL não está configurada."
+    )
 
 # Objeto que gerencia a conexão entre SQLAlchemy e PostgreSQL
 engine = create_engine(
