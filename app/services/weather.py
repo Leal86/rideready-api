@@ -72,7 +72,7 @@ def get_weather_forecast(
     )
 
     target_datetime = (
-        f"{scheduled_date.isoformat()}T" f"{target_hour.strftime('%H:%M')}"
+        f"{scheduled_date.isoformat()}T{target_hour.strftime('%H:%M')}"
     )
 
     try:
