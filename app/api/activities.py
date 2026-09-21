@@ -24,6 +24,7 @@ router = APIRouter(
     tags=["Activities"],
 )
 
+ACTIVITY_NOT_FOUND = "Atividade não encontrada."
 
 @router.get(
     "",
@@ -48,7 +49,7 @@ def get_activity(
     if activity is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atividade não encontrada.",
+            detail=ACTIVITY_NOT_FOUND,
         )
 
     return activity
@@ -140,7 +141,7 @@ def update_activity(
     if activity is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atividade não encontrada.",
+            detail=ACTIVITY_NOT_FOUND,
         )
 
     data = payload.model_dump(exclude_unset=True)
@@ -239,7 +240,7 @@ def get_activity_weather(
     if activity is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atividade não encontrada.",
+            detail=ACTIVITY_NOT_FOUND,
         )
 
     if activity.status != "PLANNED":
@@ -338,7 +339,7 @@ def delete_activity(
     if activity is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atividade não encontrada.",
+            detail=ACTIVITY_NOT_FOUND,
         )
 
     activity_service.delete_activity(db, activity)
