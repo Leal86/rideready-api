@@ -49,6 +49,7 @@ class ActivityResponse(ActivityBase):
     id: int
     latitude: Decimal
     longitude: Decimal
+    timezone: str | None = None
     status: ActivityStatus
     created_at: datetime
     updated_at: datetime

@@ -4,8 +4,10 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.database import SessionLocal
 from app.main import app
-from app.services.locations import LocationSuggestion
+from app.models.activity import Activity
+from app.services.locations import LocationSuggestion, ReverseLocation
 from app.services.weather import WeatherResult
 
 TODAY = date.today()
@@ -44,6 +46,7 @@ def mock_location_search(monkeypatch):
             latitude=38.72509,
             longitude=-9.14980,
             formatted="Lisboa, Portugal",
+            timezone="Europe/Lisbon",
         ),
         "Porto": LocationSuggestion(
             name="Porto",
@@ -54,6 +57,7 @@ def mock_location_search(monkeypatch):
             latitude=41.14850,
             longitude=-8.61097,
             formatted="Porto, Portugal",
+            timezone="Europe/Lisbon",
         ),
         "Sintra": LocationSuggestion(
             name="Sintra",
@@ -64,6 +68,7 @@ def mock_location_search(monkeypatch):
             latitude=38.80290,
             longitude=-9.38170,
             formatted="Sintra, Portugal",
+            timezone="Europe/Lisbon",
         ),
         "Cascais": LocationSuggestion(
             name="Cascais",
@@ -74,6 +79,7 @@ def mock_location_search(monkeypatch):
             latitude=38.69790,
             longitude=-9.42150,
             formatted="Cascais, Portugal",
+            timezone="Europe/Lisbon",
         ),
     }
 
@@ -123,6 +129,7 @@ def test_create_activity():
     assert data["title"] == "Caminhada de Teste"
     assert data["activity_type"] == "WALKING"
     assert data["location_name"] == "Lisboa, Portugal"
+    assert data["timezone"] == "Europe/Lisbon"
     assert data["status"] == "PLANNED"
     assert "id" in data
 
@@ -325,6 +332,185 @@ def test_update_activity_returns_422_when_location_is_not_found(
     assert response.status_code == 422
     assert response.json() == {
         "detail": "Não foi possível encontrar o local informado."
+    }
+
+
+def test_can_complete_legacy_activity_after_local_scheduled_time(
+    monkeypatch,
+):
+    """Conclui atividade antiga sem timezone usando geocodificação reversa."""
+
+    payload = {
+        "title": "Atividade Legada",
+        "activity_type": "RUNNING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "09:55:00",
+        "notes": "Teste de regressão do timezone",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    # Simula um registo criado antes da introdução do campo timezone.
+    # A data é colocada no passado diretamente no banco para não
+    # contornar a validação correta existente no POST público.
+    with SessionLocal() as db:
+        activity = db.get(Activity, activity_id)
+
+        assert activity is not None
+
+        activity.scheduled_date = PAST_DATE
+        activity.timezone = None
+
+        db.commit()
+
+    def fake_reverse_location(latitude, longitude):
+        assert latitude == pytest.approx(38.72509)
+        assert longitude == pytest.approx(-9.14980)
+
+        return ReverseLocation(
+            city="Lisboa",
+            state="Lisboa",
+            country="Portugal",
+            formatted="Lisboa, Portugal",
+            timezone="Europe/Lisbon",
+        )
+
+    monkeypatch.setattr(
+        "app.api.activities.reverse_location",
+        fake_reverse_location,
+    )
+
+    response = client.patch(
+        f"/activities/{activity_id}",
+        json={"status": "COMPLETED"},
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "COMPLETED"
+    assert data["timezone"] == "Europe/Lisbon"
+
+    # Confirma que o timezone recuperado não ficou apenas na resposta:
+    # ele também foi efetivamente persistido.
+    with SessionLocal() as db:
+        persisted_activity = db.get(Activity, activity_id)
+
+        assert persisted_activity is not None
+        assert persisted_activity.status == "COMPLETED"
+        assert persisted_activity.timezone == "Europe/Lisbon"
+
+
+def test_complete_legacy_activity_returns_503_when_reverse_location_fails(
+    monkeypatch,
+):
+    """Retorna 503 se o timezone legado não puder ser recuperado."""
+
+    payload = {
+        "title": "Atividade Legada com Falha",
+        "activity_type": "RUNNING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "10:00:00",
+        "notes": "Teste de falha da geocodificação reversa",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    with SessionLocal() as db:
+        activity = db.get(Activity, activity_id)
+
+        assert activity is not None
+
+        activity.scheduled_date = PAST_DATE
+        activity.timezone = None
+
+        db.commit()
+
+    def fake_reverse_location(latitude, longitude):
+        raise httpx2.HTTPError("Geoapify indisponível")
+
+    monkeypatch.setattr(
+        "app.api.activities.reverse_location",
+        fake_reverse_location,
+    )
+
+    response = client.patch(
+        f"/activities/{activity_id}",
+        json={"status": "COMPLETED"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Serviço de localização temporariamente indisponível."
+    }
+
+
+def test_complete_legacy_activity_returns_422_without_timezone(
+    monkeypatch,
+):
+    """Retorna 422 quando não é possível determinar o timezone legado."""
+
+    payload = {
+        "title": "Atividade Legada sem Timezone",
+        "activity_type": "RUNNING",
+        "location_name": "Lisboa",
+        "scheduled_date": FUTURE_DATE.isoformat(),
+        "scheduled_time": "11:00:00",
+        "notes": "Teste de timezone indisponível",
+    }
+
+    create_response = client.post(
+        "/activities?allow_conflict=true",
+        json=payload,
+    )
+
+    assert create_response.status_code == 201
+
+    activity_id = create_response.json()["id"]
+
+    with SessionLocal() as db:
+        activity = db.get(Activity, activity_id)
+
+        assert activity is not None
+
+        activity.scheduled_date = PAST_DATE
+        activity.timezone = None
+
+        db.commit()
+
+    monkeypatch.setattr(
+        "app.api.activities.reverse_location",
+        lambda latitude, longitude: None,
+    )
+
+    response = client.patch(
+        f"/activities/{activity_id}",
+        json={"status": "COMPLETED"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": (
+            "Não foi possível determinar o timezone "
+            "da localização da atividade."
+        )
     }
 
 
@@ -883,6 +1069,7 @@ def test_activity_change_invalidates_weather_snapshot(monkeypatch):
     activity = update_response.json()
 
     assert activity["location_name"] == "Porto, Portugal"
+    assert activity["timezone"] == "Europe/Lisbon"
 
     assert activity["weather_checked_at"] is None
     assert activity["weather_temperature"] is None

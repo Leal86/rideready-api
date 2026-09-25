@@ -17,6 +17,7 @@ class LocationSuggestion:
     latitude: float
     longitude: float
     formatted: str
+    timezone: str
 
 
 @dataclass
@@ -25,6 +26,7 @@ class ReverseLocation:
     state: str | None
     country: str
     formatted: str
+    timezone: str
 
 
 def _format_location_parts(
@@ -102,6 +104,11 @@ def search_locations(query: str) -> list[LocationSuggestion]:
         state = item.get("state")
         country = item.get("country", "")
 
+        timezone = item.get("timezone", {}).get("name")
+
+        if not timezone:
+            continue
+
         formatted = _format_location_parts(
             name,
             city,
@@ -122,6 +129,7 @@ def search_locations(query: str) -> list[LocationSuggestion]:
                 latitude=item["lat"],
                 longitude=item["lon"],
                 formatted=formatted,
+                timezone=timezone,
             )
         )
 
@@ -181,6 +189,11 @@ def reverse_location(
     state = item.get("state")
     country = item.get("country", "")
 
+    timezone = item.get("timezone", {}).get("name")
+
+    if not timezone:
+        return None
+
     display_parts = []
 
     if city:
@@ -205,4 +218,5 @@ def reverse_location(
         state=state,
         country=country,
         formatted=formatted,
+        timezone=timezone,
     )

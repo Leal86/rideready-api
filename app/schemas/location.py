@@ -10,6 +10,7 @@ class LocationSuggestionResponse(BaseModel):
     latitude: float
     longitude: float
     formatted: str
+    timezone: str
 
 
 class ReverseLocationResponse(BaseModel):
@@ -17,3 +18,4 @@ class ReverseLocationResponse(BaseModel):
     state: str | None
     country: str
     formatted: str
+    timezone: str

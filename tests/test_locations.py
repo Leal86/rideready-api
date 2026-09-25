@@ -24,6 +24,7 @@ def test_search_locations(monkeypatch):
                 latitude=38.705681,
                 longitude=-9.1435482,
                 formatted="Cais do Sodré, Lisbon, Portugal",
+                timezone="Europe/Lisbon",
             )
         ]
 
@@ -47,6 +48,7 @@ def test_search_locations(monkeypatch):
     assert data[0]["latitude"] == 38.705681
     assert data[0]["longitude"] == -9.1435482
     assert data[0]["formatted"] == "Cais do Sodré, Lisbon, Portugal"
+    assert data[0]["timezone"] == "Europe/Lisbon"
 
 
 def test_search_locations_query_too_short():
@@ -113,6 +115,7 @@ def test_reverse_location(monkeypatch):
             state="Lisboa",
             country="Portugal",
             formatted="Lisboa, Portugal",
+            timezone="Europe/Lisbon",
         )
 
     monkeypatch.setattr(
@@ -135,6 +138,7 @@ def test_reverse_location(monkeypatch):
         "state": "Lisboa",
         "country": "Portugal",
         "formatted": "Lisboa, Portugal",
+        "timezone": "Europe/Lisbon",
     }
 
 

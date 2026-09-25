@@ -34,6 +34,9 @@ def test_search_locations_formats_and_removes_duplicates(monkeypatch):
                 "country_code": "pt",
                 "lat": 38.768,
                 "lon": -9.095,
+                "timezone": {
+                    "name": "Europe/Lisbon",
+                },
             },
             {
                 "name": "Parque das Nações",
@@ -43,6 +46,9 @@ def test_search_locations_formats_and_removes_duplicates(monkeypatch):
                 "country_code": "pt",
                 "lat": 38.768,
                 "lon": -9.095,
+                "timezone": {
+                    "name": "Europe/Lisbon",
+                },
             },
         ]
     }
@@ -93,6 +99,9 @@ def test_search_locations_uses_fallback_fields(monkeypatch):
                 "country": "Portugal",
                 "lat": 38.7078,
                 "lon": -9.1366,
+                "timezone": {
+                    "name": "Europe/Lisbon",
+                },
             }
         ]
     }
@@ -109,6 +118,7 @@ def test_search_locations_uses_fallback_fields(monkeypatch):
     assert result[0].city == "Lisboa"
     assert result[0].country_code == ""
     assert result[0].formatted == ("Praça do Comércio, Lisboa, Portugal")
+    assert result[0].timezone == "Europe/Lisbon"
 
 
 def test_search_locations_includes_distinct_state(monkeypatch):
@@ -126,6 +136,9 @@ def test_search_locations_includes_distinct_state(monkeypatch):
                 "country_code": "us",
                 "lat": 40.7829,
                 "lon": -73.9654,
+                "timezone": {
+                    "name": "America/New_York",
+                },
             }
         ]
     }
@@ -141,6 +154,33 @@ def test_search_locations_includes_distinct_state(monkeypatch):
     assert result[0].formatted == (
         "Central Park, New York, New York State, United States"
     )
+    assert result[0].timezone == "America/New_York"
+
+
+def test_search_locations_ignores_result_without_timezone(monkeypatch):
+    """Ignora resultados que não informam um timezone IANA."""
+
+    monkeypatch.setenv("GEOAPIFY_API_KEY", "test-key")
+
+    response_data = {
+        "results": [
+            {
+                "name": "Local sem timezone",
+                "city": "Lisboa",
+                "country": "Portugal",
+                "country_code": "pt",
+                "lat": 38.7223,
+                "lon": -9.1393,
+            }
+        ]
+    }
+
+    monkeypatch.setattr(
+        "app.services.locations.httpx2.get",
+        lambda *args, **kwargs: FakeResponse(response_data),
+    )
+
+    assert search_locations("Local sem timezone") == []
 
 
 def test_search_locations_returns_empty_list(monkeypatch):
@@ -182,6 +222,9 @@ def test_reverse_location_formats_result(monkeypatch):
                 "city": "Lisboa",
                 "state": "Lisboa",
                 "country": "Portugal",
+                "timezone": {
+                    "name": "Europe/Lisbon",
+                },
             }
         ]
     }
@@ -214,6 +257,7 @@ def test_reverse_location_formats_result(monkeypatch):
     assert result.state == "Lisboa"
     assert result.country == "Portugal"
     assert result.formatted == "Lisboa, Portugal"
+    assert result.timezone == "Europe/Lisbon"
 
 
 def test_reverse_location_includes_distinct_state(monkeypatch):
@@ -227,6 +271,9 @@ def test_reverse_location_includes_distinct_state(monkeypatch):
                 "city": "New York",
                 "state": "New York State",
                 "country": "United States",
+                "timezone": {
+                    "name": "America/New_York",
+                },
             }
         ]
     }
@@ -246,6 +293,35 @@ def test_reverse_location_includes_distinct_state(monkeypatch):
     assert result.state == "New York State"
     assert result.country == "United States"
     assert result.formatted == ("New York, New York State, United States")
+    assert result.timezone == "America/New_York"
+
+
+def test_reverse_location_returns_none_without_timezone(monkeypatch):
+    """Devolve None quando o resultado não informa um timezone IANA."""
+
+    monkeypatch.setenv("GEOAPIFY_API_KEY", "test-key")
+
+    response_data = {
+        "results": [
+            {
+                "city": "Lisboa",
+                "state": "Lisboa",
+                "country": "Portugal",
+            }
+        ]
+    }
+
+    monkeypatch.setattr(
+        "app.services.locations.httpx2.get",
+        lambda *args, **kwargs: FakeResponse(response_data),
+    )
+
+    result = reverse_location(
+        latitude=38.7223,
+        longitude=-9.1393,
+    )
+
+    assert result is None
 
 
 def test_reverse_location_returns_none_without_results(monkeypatch):

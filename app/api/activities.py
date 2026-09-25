@@ -13,10 +13,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.activity import ActivityCreate, ActivityResponse, ActivityUpdate
 from app.services import activity as activity_service
-from app.services.locations import search_locations
+from app.services.locations import reverse_location, search_locations
 from app.schemas.weather import WeatherResponse
 from app.services.weather import get_weather_forecast
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from app.services.assessment import assess_weather_conditions
 
 router = APIRouter(
@@ -25,6 +26,54 @@ router = APIRouter(
 )
 
 ACTIVITY_NOT_FOUND = "Atividade não encontrada."
+
+
+def get_scheduled_datetime(
+    scheduled_date,
+    scheduled_time,
+    timezone_name: str,
+) -> datetime:
+    """Converte a data e hora locais da atividade num datetime com timezone."""
+    return datetime.combine(
+        scheduled_date,
+        scheduled_time,
+        tzinfo=ZoneInfo(timezone_name),
+    )
+
+
+def resolve_activity_timezone(
+    activity,
+) -> str:
+    """Obtém o timezone da atividade, inclusive para registos antigos."""
+    if activity.timezone:
+        return activity.timezone
+
+    try:
+        location = reverse_location(
+            latitude=float(activity.latitude),
+            longitude=float(activity.longitude),
+        )
+    except httpx2.HTTPError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de localização temporariamente indisponível.",
+        )
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço de localização não está configurado.",
+        )
+
+    if location is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Não foi possível determinar o timezone " "da localização da atividade."
+            ),
+        )
+
+    return location.timezone
+
 
 @router.get(
     "",
@@ -116,11 +165,27 @@ def create_activity(
 
     location = locations[0]
 
+    scheduled_datetime = get_scheduled_datetime(
+        payload.scheduled_date,
+        payload.scheduled_time,
+        location.timezone,
+    )
+
+    if scheduled_datetime < datetime.now(ZoneInfo(location.timezone)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "field": "scheduled_datetime",
+                "message": ("A data e a hora da atividade não podem estar no passado."),
+            },
+        )
+
     data = payload.model_dump()
 
     data["location_name"] = location.formatted
     data["latitude"] = location.latitude
     data["longitude"] = location.longitude
+    data["timezone"] = location.timezone
 
     return activity_service.create_activity(db, data)
 
@@ -167,33 +232,8 @@ def update_activity(
             }
         )
 
-    if data.get("status") == "COMPLETED":
-        scheduled_date = data.get(
-            "scheduled_date",
-            activity.scheduled_date,
-        )
-        scheduled_time = data.get(
-            "scheduled_time",
-            activity.scheduled_time,
-        )
-
-        scheduled_datetime = datetime.combine(
-            scheduled_date,
-            scheduled_time,
-        )
-
-        if scheduled_datetime > datetime.now():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail={
-                    "field": "status",
-                    "message": (
-                        "A atividade só pode ser concluída "
-                        "a partir da data e hora agendadas."
-                    ),
-                },
-            )
-
+    # Se a localização foi alterada, obtemos novamente as coordenadas
+    # e o timezone correspondentes ao novo local.
     if "location_name" in data:
         try:
             locations = search_locations(payload.location_name)
@@ -219,6 +259,46 @@ def update_activity(
         data["location_name"] = location.formatted
         data["latitude"] = location.latitude
         data["longitude"] = location.longitude
+        data["timezone"] = location.timezone
+
+    # A validação de conclusão precisa usar o estado final da atividade:
+    # data/hora recebidas no PATCH, quando existirem, e o timezone da
+    # nova localização ou da atividade já armazenada.
+    if data.get("status") == "COMPLETED":
+        scheduled_date = data.get(
+            "scheduled_date",
+            activity.scheduled_date,
+        )
+        scheduled_time = data.get(
+            "scheduled_time",
+            activity.scheduled_time,
+        )
+
+        timezone_name = data.get("timezone")
+
+        if timezone_name is None:
+            timezone_name = resolve_activity_timezone(activity)
+
+            if activity.timezone is None:
+                data["timezone"] = timezone_name
+
+        scheduled_datetime = get_scheduled_datetime(
+            scheduled_date,
+            scheduled_time,
+            timezone_name,
+        )
+
+        if scheduled_datetime > datetime.now(ZoneInfo(timezone_name)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "field": "status",
+                    "message": (
+                        "A atividade só pode ser concluída "
+                        "a partir da data e hora agendadas."
+                    ),
+                },
+            )
 
     return activity_service.update_activity(db, activity, data)
 
@@ -227,8 +307,6 @@ def update_activity(
     "/{activity_id}/weather",
     response_model=WeatherResponse,
 )
-
-
 def get_activity_weather(
     activity_id: int,
     db: Session = Depends(get_db),

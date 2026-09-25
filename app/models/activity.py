@@ -53,6 +53,11 @@ class Activity(Base):
         nullable=False,
     )
 
+    timezone: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
     scheduled_time: Mapped[time] = mapped_column(
         Time,
         nullable=False,
