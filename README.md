@@ -86,6 +86,7 @@ Uma atividade possui os seguintes dados principais:
 | `location_name` | Localização normalizada |
 | `latitude` | Latitude da localização |
 | `longitude` | Longitude da localização |
+| `timezone` | Fuso horário IANA associado à localização |
 | `scheduled_date` | Data planeada |
 | `scheduled_time` | Hora planeada |
 | `notes` | Observações opcionais |
@@ -183,7 +184,7 @@ A API aplica validações adicionais às atividades:
 - uma atividade não pode ser criada para uma data e hora no passado;
 - por defeito, duas atividades não podem ocupar exatamente a mesma data e hora;
 - o conflito pode ser autorizado explicitamente através de `allow_conflict=true`;
-- uma atividade futura não pode ser marcada como `COMPLETED` antes da data e hora agendadas;
+- uma atividade futura não pode ser marcada como `COMPLETED` antes da data e hora agendadas, considerando o fuso horário da localização;
 - a previsão meteorológica só pode ser atualizada para atividades com estado `PLANNED`;
 - alterações em campos relevantes para a meteorologia invalidam o snapshot meteorológico anterior.
 
@@ -215,7 +216,7 @@ As APIs externas são consumidas pelo backend do RideReady através de requisiç
 
 ### Geoapify
 
-O RideReady utiliza a **Geoapify Geocoding API** para pesquisa de localidades, autocomplete e geocodificação reversa.
+O RideReady utiliza a **Geoapify Geocoding API** para pesquisa de localidades, autocomplete e geocodificação reversa. Os dados tratados pelo backend incluem também o fuso horário IANA associado à localização, utilizado nas validações temporais das atividades.
 
 Endpoints externos utilizados:
 
